@@ -273,6 +273,14 @@ void Gauge::can_callback(QByteArray payload){
     for(auto cmd : cmds){
         if(cmd.frame.payload().at(2) == resp.PID){
             double value = this->decoder(cmd.decoder(resp), this->si);
+            if (!std::isfinite(value)) {
+                DASH_LOG(warning)
+                << "[Gauges] Invalid response for PID "
+                << static_cast<int>(resp.PID)
+                << ", payload "
+                << payload.toHex();
+                return;
+            }
             static_cast<RadialGaugeLabel *>(value_label)->set_gauge_value(this->format_value(value), value, true);
         }
     }
