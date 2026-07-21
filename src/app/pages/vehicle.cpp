@@ -3,6 +3,10 @@
 #include <QPen>
 #include <QSerialPortInfo>
 
+//For speed Correction - Eric KG6WXC
+#include <QByteArray>
+#include <QtGlobal>
+
 #include <algorithm>
 #include <cmath>
 
@@ -14,6 +18,24 @@
 #include "plugins/vehicle_plugin.hpp"
 
 namespace {
+
+//For speed Correction - Eric KG6WXC
+double configured_speed_correction()
+{
+    const QByteArray raw_value = qgetenv("DASH_SPEED_CORRECTION");
+
+    if (raw_value.isEmpty())
+        return 1.0;
+
+    bool valid = false;
+    const double correction = raw_value.toDouble(&valid);
+
+    // Invalid, zero, or negative values fall back to no correction.
+    if (!valid || correction <= 0.0)
+        return 1.0;
+
+    return correction;
+}
 
 class RadialGaugeLabel : public QLabel
 {
@@ -538,9 +560,18 @@ QWidget *DataTab::speed_widget()
     unit_font.setBold(true);
     unit_font.setItalic(false);
 
+    //For speed Correction - Eric KG6WXC
+    const double speed_correction = configured_speed_correction();
+
+    //Change below decoder For speed Correction - Eric KG6WXC
     Gauge *speed = new Gauge({"mph", "km/h"}, value_font, unit_font,
                              Gauge::BOTTOM, 100, {cmds.SPEED}, 0,
-                             [](double x, bool si) { return si ? x : kph_to_mph(x); }, widget);
+                             [speed_correction](double x, bool si) {
+                                 const double corrected_kph = x * speed_correction;
+                                 return si ? corrected_kph : kph_to_mph(corrected_kph);
+                             },
+                             widget);
+
     layout->addWidget(speed, 0, Qt::AlignHCenter);
     this->gauges.push_back(speed);
 
